@@ -32,14 +32,23 @@ const protect = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: "Auth check fail",
-        error: error.message,
-      });
+    return res.status(500).json({
+      success: false,
+      message: "Auth check fail",
+      error: error.message,
+    });
   }
 };
+const isAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: "Not Authorized" });
+  }
+  if (req.user.role !== "admin") {
+    return res
+      .status(403)
+      .json({ success: false, message: "Access denied-admin only" });
+  }
+  next();
+};
 
-module.exports = protect;
+module.exports = { protect, isAdmin };
