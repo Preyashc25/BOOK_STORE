@@ -79,7 +79,7 @@ const bookSchema = mongoose.Schema(
 bookSchema.index({ title: "text", author: "text", description: "text" });
 
 bookSchema.virtual("finalPrice").get(function () {
-  return this.price - (this.price * this.discountPrice) / 100;
+  return this.price - (this.price * this.discountPercent) / 100;
 });
 
 const bookModel = mongoose.model("books", bookSchema);
