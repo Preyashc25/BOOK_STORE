@@ -1,11 +1,11 @@
 // src/components/common/Navbar.jsx
 import { Link } from "react-router-dom";
-// import { useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 
 const Navbar = () => {
-  // const { items } = useSelector((state) => state.cart);
-  // const cartCount = items?.reduce((sum, i) => sum + i.qty, 0) || 0;
-  const cartCount = 1
+  const { items } = useSelector((state) => state.cart);
+  const cartCount = items?.reduce((sum, i) => sum + i.qty, 0) || 0;
+
   return (
     <header className="border-b border-ink/10 bg-parchment sticky top-0 z-40">
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
