@@ -47,7 +47,7 @@ const Cart = () => {
               <img
                 src={item.coverImage}
                 alt={item.title}
-                className="w-20 aspect-[2/3] object-cover shadow-book flex-shrink-0"
+                className="w-20 aspect-2/3 object-cover shadow-book shrink-0"
               />
               <div className="flex-1 flex flex-col justify-between">
                 <div>

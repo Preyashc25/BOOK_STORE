@@ -7,14 +7,14 @@ const getAllUsers = async (req, res) => {
     const { page = 1, limit = 20, search } = req.query;
     const query = {};
     if (search) {
-      query.$or[
-        ({ name: { $regex: search, $option: "i" } },
-        { email: { $regex: search, $option: "i" } })
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
       ];
     }
     const skip = (Number(page) - 1) * Number(limit);
 
-    const [users,total] = await Promise.all([
+    const [users, total] = await Promise.all([
       userModel
         .find(query)
         .select("-password -refreshToken")
@@ -42,11 +42,11 @@ const getAllUsers = async (req, res) => {
 };
 const updateUser = async (req, res) => {
   try {
-    if (req.params.id !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    if (
+      req.params.id !== req.user._id.toString() &&
+      req.user.role !== "admin"
+    ) {
+      return res.status(403).json({ success: false, message: "Access denied" });
     }
     const { name, address } = req.body;
     const updateFields = {};
@@ -86,11 +86,11 @@ const updateUser = async (req, res) => {
 };
 const deleteUser = async (req, res) => {
   try {
-    if (req.params.id !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    if (
+      req.params.id !== req.user._id.toString() &&
+      req.user.role !== "admin"
+    ) {
+      return res.status(403).json({ success: false, message: "Access denied" });
     }
     const user = await userModel.findById(req.params.id);
     if (!user) {

@@ -1,7 +1,7 @@
 // src/routes/AppRoutes.jsx
 import { Routes, Route, Outlet } from "react-router-dom";
 import MainLayout from "../layouts/MainLayout";
-import AdminLayout from "../layouts/AdminLayout";
+import AdminLayout from "../layouts/AdminLayOut";
 import Home from "../pages/Home";
 import Shop from "../pages/Shop";
 import ProductPage from "../pages/ProductPage";
@@ -12,8 +12,12 @@ import OrderHistory from "../pages/OrderHistory";
 import PrivateRoute from "./PrivateRoute";
 import AdminRoute from "./AdminRoute";
 import AdminDashboard from "../pages/AdminDashboard";
-import Checkout from'../pages/Checkout'
+import Checkout from "../pages/Checkout";
 import AdminBooks from "../pages/AdminBooks";
+import AdminCategories from "../pages/AdminCategories";
+import AdminOrders from "../pages/AdminOrders";
+import AdminUsers from "../pages/AdminUsers";
+import Profile from "../pages/Profile";
 
 // Wraps public pages with the main site chrome (Navbar/Footer)
 const PublicLayoutWrapper = () => (
@@ -42,7 +46,6 @@ const AppRoutes = () => {
         <Route path="/shop" element={<Shop />} />
         <Route path="/book/:id" element={<ProductPage />} />
         <Route path="/cart" element={<Cart />} />
-        // src/routes/AppRoutes.jsx — inside PublicLayoutWrapper's children
         <Route
           path="/checkout"
           element={
@@ -60,12 +63,22 @@ const AppRoutes = () => {
           }
         />
       </Route>
-
+      <Route
+        path="/profile"
+        element={
+          <PrivateRoute>
+            <Profile />
+          </PrivateRoute>
+        }
+      />
       {/* Admin routes — get AdminLayout instead, no public chrome */}
       <Route element={<AdminLayoutWrapper />}>
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/books" element={<AdminBooks />} />
+        <Route path="/admin/categories" element={<AdminCategories />} />
         {/* add more nested admin routes here, e.g. /admin/books, /admin/orders */}
+        <Route path="/admin/orders" element={<AdminOrders />} />
+        <Route path="/admin/users" element={<AdminUsers />} />
       </Route>
     </Routes>
   );

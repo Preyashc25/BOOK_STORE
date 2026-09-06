@@ -1,7 +1,5 @@
 const bookModel = require("../models/book.model");
 const cloudinary = require("../configs/cloudinary");
-const { all } = require("../routes/book.route");
-const { json } = require("express");
 
 const uploadToCloudinary = (buffer) => {
   return new Promise((resolve, reject) => {
@@ -27,10 +25,10 @@ const createBook = async (req, res) => {
       discountPercent,
       stock,
       category,
-      language,
-      pages,
+      languages,
+      page,
       publisher,
-      publishDate,
+      pubishDate,
     } = req.body;
 
     if (!title || !price || !description || !author || !category) {
@@ -56,10 +54,11 @@ const createBook = async (req, res) => {
       discountPercent,
       stock,
       category,
-      language,
-      pages,
+      images,
+      languages,
+      page,
       publisher,
-      publishDate,
+      pubishDate,
     });
 
     res.status(201).json({ success: true, book });
@@ -88,7 +87,7 @@ const updateBook = async (req, res) => {
         .json({ success: false, message: "Book Not Found" });
     }
 
-    if (req.files && req.files.length > 0) {
+    if (req.files?.length) {
       const deletePromises = book.images.map((img) =>
         cloudinary.uploader.destroy(img.publicId),
       );
@@ -102,7 +101,7 @@ const updateBook = async (req, res) => {
     const updateBook = await bookModel.findByIdAndUpdate(
       req.params.id,
       { $set: req.body },
-      { new: true, runValidator: true },
+      { new: true, runValidators: true },
     );
 
     res.status(200).json({ success: true, book: updateBook });

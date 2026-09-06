@@ -40,7 +40,7 @@ const BookTable = ({ books, onEdit, onDelete }) => {
               <img
                 src={book.coverImage}
                 alt={book.title}
-                className="w-10 aspect-[2/3] object-cover shadow-book"
+                className="w-10 aspect-2/3 object-cover shadow-book"
               />
             </td>
             <td className="py-3 pr-4 text-ink">{book.title}</td>

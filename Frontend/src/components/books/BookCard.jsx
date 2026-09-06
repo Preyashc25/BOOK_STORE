@@ -1,15 +1,26 @@
 // src/components/books/BookCard.jsx
-import { Link } from 'react-router-dom';
-import { formatPrice } from '../../utils/formatPrice';
+import { Link } from "react-router-dom";
+import { formatPrice } from "../../utils/formatPrice";
 
 const BookCard = ({ book }) => {
-  const { _id, title, author, price, discountPercent, stock, images, ratingAvg } = book;
-  const finalPrice = discountPercent ? price - (price * discountPercent) / 100 : price;
+  const {
+    _id,
+    title,
+    author,
+    price,
+    discountPercent,
+    stock,
+    images,
+    ratingAvg,
+  } = book;
+  const finalPrice = discountPercent
+    ? price - (price * discountPercent) / 100
+    : price;
   const coverUrl = images?.[0]?.url;
 
   return (
     <Link to={`/book/${_id}`} className="group flex flex-col">
-      <div className="relative overflow-hidden bg-shelf shadow-book group-hover:shadow-bookHover transition-shadow duration-300 aspect-[2/3]">
+      <div className="relative overflow-hidden bg-shelf shadow-book group-hover:shadow-bookHover transition-shadow duration-300 aspect-2/3">
         <img
           src={coverUrl}
           alt={`${title} cover`}
@@ -33,9 +44,13 @@ const BookCard = ({ book }) => {
         </h3>
         <p className="text-sm text-ink/60 mt-0.5">{author}</p>
         <div className="flex items-center gap-2 mt-1.5">
-          <span className="text-sm text-leather font-medium">{formatPrice(finalPrice)}</span>
+          <span className="text-sm text-leather font-medium">
+            {formatPrice(finalPrice)}
+          </span>
           {discountPercent > 0 && (
-            <span className="text-xs text-ink/40 line-through">{formatPrice(price)}</span>
+            <span className="text-xs text-ink/40 line-through">
+              {formatPrice(price)}
+            </span>
           )}
         </div>
         {ratingAvg > 0 && (

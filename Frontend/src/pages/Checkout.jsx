@@ -114,8 +114,6 @@ const Checkout = () => {
           <h2 className="font-display text-xl text-ink mb-4">
             Shipping address
           </h2>
-          // Updated form fields (replace the "Address line" input and add new
-          ones)
           <div>
             <label className="block font-sans text-xs uppercase tracking-wide text-ink/60 mb-1.5">
               Full name
@@ -155,7 +153,6 @@ const Checkout = () => {
               className="w-full border border-ink/20 bg-white px-4 py-2.5 font-sans text-sm text-ink focus:outline-none focus:border-leather transition-colors"
             />
           </div>
-          {/* City/State grid and Pincode input stay the same as before — field names already match */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block font-sans text-xs uppercase tracking-wide text-ink/60 mb-1.5">
@@ -194,7 +191,7 @@ const Checkout = () => {
               required
               value={address.pincode}
               onChange={handleChange}
-              className="w-full max-w-[200px] border border-ink/20 bg-white px-4 py-2.5 font-sans text-sm text-ink focus:outline-none focus:border-leather transition-colors"
+              className="w-full max-w-50 border border-ink/20 bg-white px-4 py-2.5 font-sans text-sm text-ink focus:outline-none focus:border-leather transition-colors"
             />
           </div>
           {error && (

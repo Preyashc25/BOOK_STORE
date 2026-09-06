@@ -15,11 +15,12 @@ const AdminBooks = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
 
+  // src/pages/AdminBooks.jsx — just the loadBooks function changes
   const loadBooks = async () => {
     setLoading(true);
     try {
-      const data = await getAllBooks();
-      setBooks(data.books || data);
+      const data = await getAllBooks({ limit: 100 }); // admin wants to see more at once, no pagination UI here yet
+      setBooks(data.books || []);
     } finally {
       setLoading(false);
     }
