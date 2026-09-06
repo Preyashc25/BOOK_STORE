@@ -3,7 +3,7 @@ const router = express.Router();
 const orderController = require("../controllers/order.controller");
 const { protect, isAdmin } = require("../middlewares/auth.middleware");
 
-router.post("/", protect, orderController.placeOrder);
+router.post("/create", protect, orderController.placeOrder);//Modified from "/"
 router.get("/my-order", protect, orderController.myOrder);
 router.get("/:id", protect, orderController.getSingleOrderDetail);
 router.get("/", protect, isAdmin, orderController.getAllOrders);

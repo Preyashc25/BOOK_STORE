@@ -1,7 +1,7 @@
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
-const { notFound, errorHandler } = require("./middlewares/errorHandler");
+// const { notFound } = require("./middlewares/errorHandler");
 
 const authRouter = require("./routes/auth.route");
 const bookRouter = require("./routes/book.route");
@@ -34,7 +34,7 @@ app.use("/api/order", orderRouter);
 app.use("/api/review", reviewRouter);
 app.use("/api/users", userRouter);
 
-app.use(notFound);
-app.use(errorHandler);
+// app.use(notFound);
+// app.use(errorHandler);
 
 module.exports = app;

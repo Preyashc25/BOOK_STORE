@@ -1,15 +1,24 @@
 // src/components/common/Navbar.jsx
 import { Link } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { clearUser } from "../../features/auth/authSlice";
+import { useNavigate } from "react-router-dom";
 
 const Navbar = () => {
   const { items } = useSelector((state) => state.cart);
   const cartCount = items?.reduce((sum, i) => sum + i.qty, 0) || 0;
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { user } = useSelector((state) => state.auth);
+
+  const handleLogout = () => {
+    dispatch(clearUser());
+    navigate("/");
+  };
 
   return (
     <header className="border-b border-ink/10 bg-parchment sticky top-0 z-40">
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-
         <Link
           to="/"
           className="font-display text-2xl tracking-tightish text-ink"
@@ -33,12 +42,24 @@ const Navbar = () => {
         </nav>
 
         <div className="flex items-center gap-5">
-          <Link
-            to="/login"
-            className="font-sans text-sm text-ink/80 hover:text-leather transition-colors"
-          >
-            Account
-          </Link>
+          {user ? (
+            <div className="flex items-center gap-3 font-sans text-sm text-ink/80">
+              <span>Hi, {user.name?.split(" ")[0]}</span>
+              <button
+                onClick={handleLogout}
+                className="hover:text-leather transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            <Link
+              to="/login"
+              className="font-sans text-sm text-ink/80 hover:text-leather transition-colors"
+            >
+              Account
+            </Link>
+          )}
           <Link to="/cart" className="relative font-sans text-sm">
             <span className="border border-ink/20 rounded-sm px-3 py-1.5 hover:border-leather hover:text-leather transition-colors">
               Cart
