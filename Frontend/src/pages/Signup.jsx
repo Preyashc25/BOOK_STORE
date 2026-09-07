@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register } from "../services/authService";
 import { useDispatch } from "react-redux";
-
+import { setUser } from "../features/auth/authSlice";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -24,7 +24,6 @@ const Signup = () => {
     setError("");
     setLoading(true);
     try {
-      console.log(formData)
       const data = await register(formData);
       localStorage.setItem("token", data.accessToken);
       dispatch(setUser(data.user));

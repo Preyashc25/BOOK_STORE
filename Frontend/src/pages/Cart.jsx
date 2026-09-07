@@ -12,7 +12,8 @@ const Cart = () => {
   const dispatch = useDispatch();
 
   const { items } = useSelector((state) => state.cart);
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const shipping = subtotal > 500 ? 0 : 50;
+  const total = subtotal + shipping;
 
   if (items.length === 0) {
     return (
@@ -100,11 +101,11 @@ const Cart = () => {
           </div>
           <div className="flex justify-between font-sans text-sm text-ink/70 mb-4">
             <span>Shipping</span>
-            <span>Calculated at checkout</span>
+            <span>{shipping === 0 ? "Free" : formatPrice(shipping)}</span>
           </div>
           <div className="flex justify-between font-display text-lg text-ink border-t border-ink/10 pt-4 mb-6">
             <span>Total</span>
-            <span>{formatPrice(subtotal)}</span>
+            <span>{formatPrice(total)}</span>
           </div>
           <Link
             to="/checkout"

@@ -129,13 +129,20 @@ const getDashboardStatus = async (req, res) => {
     ] = await Promise.all([
       userModel.countDocuments({ role: "user" }),
       bookModel.countDocuments(),
-      orderModel.countDocuments({ "paymentInfo.status": "paid" }),
+      orderModel.countDocuments(),
       orderModel.aggregate([
-        { $match: { "paymentInfo.status": "paid" } },
+        {
+          $match: {
+            $or: [
+              { "paymentInfo.status": "paid" },
+              { "paymentInfo.method": "cod" },
+            ],
+          },
+        },
         { $group: { _id: null, total: { $sum: "$totalAmount" } } },
       ]),
       orderModel
-        .find({ "paymentInfo.status": "paid" })
+        .find()
         .populate("user", "name email")
         .sort("-createdAt")
         .limit(5),
@@ -144,24 +151,26 @@ const getDashboardStatus = async (req, res) => {
         .select("title stock")
         .limit(10),
       orderModel.aggregate([
-        { $match: { "paymentInfo.status": "paid" } },
         { $group: { _id: "$orderStatus", count: { $sum: 1 } } },
       ]),
     ]);
+
     const totalRevenue = revenueResult[0]?.total || 0;
+    const ordersByStatus = (orderStatusCounts || []).reduce((acc, item) => {
+      if (item._id) acc[item._id] = item.count;
+      return acc;
+    }, {});
+
     res.status(200).json({
       success: true,
       stats: {
-        totalUsers,
-        totalBooks,
-        totalOrders,
-        totalRevenue,
-        recentOrders,
-        lowStockBooks,
-        ordersByStatus: orderStatusCounts.reduce((acc, item) => {
-          acc[item._id] = item.count;
-          return acc;
-        }, {}),
+        totalUsers: totalUsers || 0,
+        totalBooks: totalBooks || 0,
+        totalOrders: totalOrders || 0,
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        recentOrders: recentOrders || [],
+        lowStockBooks: lowStockBooks || [],
+        ordersByStatus,
       },
     });
   } catch (error) {

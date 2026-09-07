@@ -19,10 +19,15 @@ const createCategory = async (req, res) => {
         message: "Category name is required",
       });
     }
+
     const slug = generateSlug(name);
     const category = await categoryModel.findOne({
-      $or: [{ name: name.trim() }, { slug }],
+      $or: [
+        { name: new RegExp(`^${name.trim()}$`, "i") },
+        { slug },
+      ],
     });
+
     if (category) {
       return res
         .status(409)
@@ -34,7 +39,7 @@ const createCategory = async (req, res) => {
       slug,
     });
 
-    res.status(201).json({ success: true, newCategory });
+    res.status(201).json({ success: true, category: newCategory, newCategory });
   } catch (error) {
     if (error.code === 11000) {
       return res
@@ -48,6 +53,7 @@ const createCategory = async (req, res) => {
     });
   }
 };
+
 const getAllCategory = async (req, res) => {
   try {
     const categories = await categoryModel.find().sort("name");
@@ -56,29 +62,90 @@ const getAllCategory = async (req, res) => {
       .json({ success: true, count: categories.length, categories });
   } catch (error) {
     return res.status(500).json({
-      success: true,
+      success: false,
       message: "Failed to fetch categories",
       error: error.message,
     });
   }
 };
+
+const updateCategory = async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Category name is required",
+      });
+    }
+
+    const category = await categoryModel.findById(req.params.id);
+    if (!category) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Category not found" });
+    }
+
+    const slug = generateSlug(name);
+    const existing = await categoryModel.findOne({
+      _id: { $ne: category._id },
+      $or: [
+        { name: new RegExp(`^${name.trim()}$`, "i") },
+        { slug },
+      ],
+    });
+
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: "Another category with this name already exists",
+      });
+    }
+
+    category.name = name.trim();
+    category.slug = slug;
+    await category.save();
+
+    res.status(200).json({ success: true, category });
+  } catch (error) {
+    if (error.name === "CastError") {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid category ID" });
+    }
+    if (error.code === 11000) {
+      return res
+        .status(409)
+        .json({ success: false, message: "Category already exists" });
+    }
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update category",
+      error: error.message,
+    });
+  }
+};
+
 const deleteCategory = async (req, res) => {
   try {
     const category = await categoryModel.findById(req.params.id);
     if (!category) {
       return res
-        .status(400)
-        .json({ success: false, message: "Invalid category ID" });
+        .status(404)
+        .json({ success: false, message: "Category not found" });
     }
+
     const bookCount = await bookModel.countDocuments({
       category: category._id,
     });
+
     if (bookCount > 0) {
       return res.status(400).json({
         success: false,
-        message: `Cannot delete — ${bookCount} book(s) still assigned to this category. Reassign or delete them first.`,
+        message: `Cannot delete — ${bookCount} book(s) still assigned to "${category.name}". Reassign or delete them first.`,
       });
     }
+
     await category.deleteOne();
     res
       .status(200)
@@ -89,7 +156,7 @@ const deleteCategory = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Invalid category ID" });
     }
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to delete category",
       error: error.message,
@@ -100,5 +167,6 @@ const deleteCategory = async (req, res) => {
 module.exports = {
   createCategory,
   getAllCategory,
-  deleteCategory
+  updateCategory,
+  deleteCategory,
 };

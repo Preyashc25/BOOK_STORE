@@ -4,6 +4,7 @@ import MainLayout from "../layouts/MainLayout";
 import AdminLayout from "../layouts/AdminLayOut";
 import Home from "../pages/Home";
 import Shop from "../pages/Shop";
+import Genres from "../pages/Genres";
 import ProductPage from "../pages/ProductPage";
 import Cart from "../pages/Cart";
 import Login from "../pages/Login";
@@ -44,6 +45,7 @@ const AppRoutes = () => {
       <Route element={<PublicLayoutWrapper />}>
         <Route path="/" element={<Home />} />
         <Route path="/shop" element={<Shop />} />
+        <Route path="/genres" element={<Genres />} />
         <Route path="/book/:id" element={<ProductPage />} />
         <Route path="/cart" element={<Cart />} />
         <Route
@@ -62,15 +64,15 @@ const AppRoutes = () => {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/profile"
+          element={
+            <PrivateRoute>
+              <Profile />
+            </PrivateRoute>
+          }
+        />
       </Route>
-      <Route
-        path="/profile"
-        element={
-          <PrivateRoute>
-            <Profile />
-          </PrivateRoute>
-        }
-      />
       {/* Admin routes — get AdminLayout instead, no public chrome */}
       <Route element={<AdminLayoutWrapper />}>
         <Route path="/admin" element={<AdminDashboard />} />

@@ -36,7 +36,7 @@ const Profile = () => {
     setSuccess(false);
     setSaving(true);
     try {
-      const data = await updateUserAdmin(user.id, { name, address });
+      const data = await updateUserAdmin(user._id, { name, address });
       dispatch(setUser({ ...user, ...data.user }));
       setSuccess(true);
     } catch (err) {

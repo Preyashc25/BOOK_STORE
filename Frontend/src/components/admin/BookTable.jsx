@@ -38,7 +38,7 @@ const BookTable = ({ books, onEdit, onDelete }) => {
           <tr key={book._id} className="border-b border-ink/5">
             <td className="py-3 pr-4">
               <img
-                src={book.coverImage}
+                src={book.images?.[0]?.url}
                 alt={book.title}
                 className="w-10 aspect-2/3 object-cover shadow-book"
               />

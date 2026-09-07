@@ -6,45 +6,104 @@ const bookModel = require("../models/book.model");
 const razorpay = require("../configs/razorpay");
 
 const placeOrder = async (req, res) => {
-  const session = await mongoose.startSession();
   try {
-    const { shippingAddress } = req.body;
+    const { shippingAddress, items } = req.body;
 
     if (
       !shippingAddress ||
       !shippingAddress.street ||
-      !shippingAddress.pincode ||
-      !shippingAddress.street
+      !shippingAddress.pincode
     ) {
       return res.status(400).json({
         success: false,
         message: "Complete shipping address is required",
       });
     }
-    const cart = await cartModel
-      .findOne({ user: req.user._id })
-      .populate("items.book");
 
-    if (!cart || cart.items.length === 0) {
-      return res.status(400).json({ success: false, message: "Cart is empty" });
-    }
+    let orderItems = [];
 
-    for (const item of cart.items) {
-      if (!item.book) {
-        return res.status(400).json({
-          success: false,
-          message: "One of the items in your cart no longer exists ",
+    // If client provided items directly (e.g. from frontend cart)
+    if (items && Array.isArray(items) && items.length > 0) {
+      for (const item of items) {
+        const bookId = item.bookId || item.book?._id || item.book;
+        const qty = Number(item.quantity || item.qty || 1);
+
+        if (!bookId) continue;
+
+        const book = await bookModel.findById(bookId);
+        if (!book) {
+          return res.status(400).json({
+            success: false,
+            message: "One of the books in your order no longer exists",
+          });
+        }
+
+        if (book.stock < qty) {
+          return res.status(400).json({
+            success: false,
+            message: `"${book.title}" only has ${book.stock} unit(s) left`,
+          });
+        }
+
+        const price =
+          book.discountPercent > 0
+            ? book.price - (book.price * book.discountPercent) / 100
+            : book.price;
+
+        orderItems.push({
+          book: book._id,
+          title: book.title,
+          price,
+          quantity: qty,
         });
       }
-      if (item.book.stock < item.quantity) {
-        return res.status(400).json({
-          success: false,
-          message: `"${item.book.title}" only has ${item.book.stock} unit(s) left`,
+    } else {
+      // Fallback to backend cartModel
+      const cart = await cartModel
+        .findOne({ user: req.user._id })
+        .populate("items.book");
+
+      if (!cart || !cart.items || cart.items.length === 0) {
+        return res.status(400).json({ success: false, message: "Cart is empty" });
+      }
+
+      for (const item of cart.items) {
+        if (!item.book) {
+          return res.status(400).json({
+            success: false,
+            message: "One of the items in your cart no longer exists",
+          });
+        }
+        if (item.book.stock < item.quantity) {
+          return res.status(400).json({
+            success: false,
+            message: `"${item.book.title}" only has ${item.book.stock} unit(s) left`,
+          });
+        }
+        const price =
+          item.priceAtAdd ??
+          (item.book.discountPercent > 0
+            ? item.book.price - (item.book.price * item.book.discountPercent) / 100
+            : item.book.price);
+
+        orderItems.push({
+          book: item.book._id,
+          title: item.book.title,
+          price,
+          quantity: item.quantity,
         });
       }
     }
-    const itemsPrice = cart.items.reduce(
-      (sum, item) => sum + item.priceAtAdd * item.quantity,
+
+    if (orderItems.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid items in order",
+      });
+    }
+
+    const itemsPrice = orderItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
       0,
     );
     const shippingPrice = itemsPrice > 500 ? 0 : 50;
@@ -52,12 +111,7 @@ const placeOrder = async (req, res) => {
 
     const order = await orderModel.create({
       user: req.user._id,
-      items: cart.items.map((item) => ({
-        book: item.book._id,
-        title: item.book.title,
-        price: item.priceAtAdd,
-        quantity: item.quantity,
-      })),
+      items: orderItems,
       shippingAddress,
       itemsPrice,
       shippingPrice,
@@ -74,6 +128,12 @@ const placeOrder = async (req, res) => {
     order.paymentInfo.orderId = razorpayOrder.id;
     await order.save();
 
+    // Clear any stale cart entries in MongoDB for this user
+    await cartModel.findOneAndUpdate(
+      { user: req.user._id },
+      { items: [] }
+    );
+
     res.status(201).json({
       success: true,
       order,
@@ -85,17 +145,17 @@ const placeOrder = async (req, res) => {
       razorpayKeyId: process.env.RAZOR_PAY_KEY_ID,
     });
   } catch (error) {
+    console.error("placeOrder error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to create order",
       error: error.message,
     });
-  } finally {
-    session.endSession();
   }
 };
+
 const verifyPayment = async (req, res) => {
-  const session = mongoose.startSession();
+  let session = null;
   try {
     const {
       razorpay_order_id,
@@ -127,63 +187,81 @@ const verifyPayment = async (req, res) => {
         message: "Payment verification failed — signature mismatch",
       });
     }
-    (await session).startTransaction();
 
-    const order = await orderModel.findById(orderId).session(session);
+    const order = await orderModel.findById(orderId);
     if (!order) {
-      (await session).abortTransaction();
       return res
         .status(404)
         .json({ success: false, message: "Order not found" });
     }
 
     if (order.paymentInfo.status === "paid") {
-      (await session).abortTransaction();
       return res
         .status(400)
         .json({ success: false, message: "Order already paid" });
     }
 
+    // Attempt MongoDB session/transaction if replica set supports it
+    try {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    } catch (sessionErr) {
+      session = null;
+    }
+
+    // Decrement stock for each item atomically
     for (const item of order.items) {
-      const updated = await bookModel.findOneAndUpdate(
-        { _id: item.book, stock: { $gte: item.quantity } },
-        { $inc: { stock: -item.quantity } },
-        { session, new: true },
-      );
+      const query = { _id: item.book, stock: { $gte: item.quantity } };
+      const update = { $inc: { stock: -item.quantity } };
+      const options = session ? { session, new: true } : { new: true };
+
+      const updated = await bookModel.findOneAndUpdate(query, update, options);
 
       if (!updated) {
-        (await session).abortTransaction();
+        if (session && session.inTransaction()) {
+          await session.abortTransaction();
+        }
         return res.status(409).json({
           success: false,
-          message: `"${item.title}" went out of stock while payment was processing. You have not been charged — please contact support to confirm refund.`,
+          message: `"${item.title}" went out of stock while payment was processing. Please contact support.`,
         });
       }
     }
+
     order.paymentInfo.paymentId = razorpay_payment_id;
     order.paymentInfo.signature = razorpay_signature;
     order.paymentInfo.status = "paid";
-    await order.save({ session });
+    await order.save(session ? { session } : undefined);
 
     await cartModel.findOneAndUpdate(
       { user: req.user._id },
       { items: [] },
-      { session },
+      session ? { session } : undefined,
     );
-    await session.commitTransaction();
+
+    if (session && session.inTransaction()) {
+      await session.commitTransaction();
+    }
 
     res.status(200).json({
       success: true,
       message: "Payment verification done successfully",
+      order,
     });
   } catch (error) {
-    (await session).abortTransaction;
+    if (session && session.inTransaction()) {
+      await session.abortTransaction();
+    }
+    console.error("verifyPayment error:", error);
     res.status(500).json({
       success: false,
       message: "Payment verification failed",
       error: error.message,
     });
   } finally {
-    (await session).endSession();
+    if (session) {
+      session.endSession();
+    }
   }
 };
 const myOrder = async (req, res) => {

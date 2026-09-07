@@ -24,6 +24,8 @@ const Checkout = () => {
   const [error, setError] = useState("");
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const shipping = subtotal > 500 ? 0 : 50;
+  const total = subtotal + shipping;
 
   const handleChange = (e) =>
     setAddress({ ...address, [e.target.name]: e.target.value });
@@ -34,22 +36,20 @@ const Checkout = () => {
     setLoading(true);
 
     try {
-      // 1. Create order on backend
+      // 1. Create order on backend with shipping address & cart items
       const orderPayload = {
+        shippingAddress: address,
         items: items.map((i) => ({
           bookId: i.bookId,
-          qty: i.qty,
-          price: i.price,
+          quantity: i.qty,
         })),
-        amount: subtotal,
-        address,
       };
       const { order, razorpayOrder, razorpayKeyId } =
         await createOrder(orderPayload);
 
       // 2. Open Razorpay checkout modal
       const options = {
-        key: razorpayKeyId, // comes from backend, not .env
+        key: razorpayKeyId, // comes from backend
         amount: razorpayOrder.amount,
         currency: razorpayOrder.currency,
         name: "Chapter & Verse",
@@ -61,19 +61,23 @@ const Checkout = () => {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              orderId: order._id, // your internal order id, likely needed to mark it paid
+              orderId: order._id,
             });
             dispatch(clearCart());
             navigate("/orders");
           } catch (verifyErr) {
+            console.error("Payment verification failed:", verifyErr);
             setError(
-              "Payment succeeded but verification failed. Contact support.",
+              verifyErr?.response?.data?.message ||
+                "Payment succeeded but verification failed. Contact support.",
             );
+            setLoading(false);
           }
         },
         prefill: {
-          name: user?.name,
+          name: address.fullName || user?.name,
           email: user?.email,
+          contact: address.phone,
         },
         theme: {
           color: "#5C3A21",
@@ -202,9 +206,9 @@ const Checkout = () => {
           <button
             type="submit"
             disabled={loading}
-            className="font-sans text-sm bg-leather text-parchment px-8 py-3 hover:bg-ink transition-colors disabled:opacity-50"
+            className="font-sans text-sm bg-leather text-parchment px-8 py-3 hover:bg-ink transition-colors disabled:opacity-50 cursor-pointer"
           >
-            {loading ? "Processing…" : `Pay ${formatPrice(subtotal)}`}
+            {loading ? "Processing…" : `Pay ${formatPrice(total)}`}
           </button>
         </form>
 
@@ -226,9 +230,19 @@ const Checkout = () => {
               </li>
             ))}
           </ul>
-          <div className="flex justify-between font-display text-lg text-ink border-t border-ink/10 pt-4">
+          <div className="space-y-2 font-sans text-sm text-ink/70 pb-4 border-b border-ink/10">
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span>{formatPrice(subtotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Shipping</span>
+              <span>{shipping === 0 ? "Free" : formatPrice(shipping)}</span>
+            </div>
+          </div>
+          <div className="flex justify-between font-display text-lg text-ink pt-4">
             <span>Total</span>
-            <span>{formatPrice(subtotal)}</span>
+            <span>{formatPrice(total)}</span>
           </div>
         </aside>
       </div>

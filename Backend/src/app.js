@@ -29,10 +29,12 @@ app.get("/api/health", (req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/books", bookRouter);
 app.use("/api/category", categoryRouter);
+app.use("/api/categories", categoryRouter);
 app.use("/api/cart", cartRouter);
 app.use("/api/order", orderRouter);
 app.use("/api/review", reviewRouter);
 app.use("/api/users", userRouter);
+app.use("/api/user", userRouter);
 
 // app.use(notFound);
 // app.use(errorHandler);

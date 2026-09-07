@@ -1,4 +1,6 @@
+const mongoose = require("mongoose");
 const bookModel = require("../models/book.model");
+const categoryModel = require("../models/category.model");
 const cloudinary = require("../configs/cloudinary");
 
 const uploadToCloudinary = (buffer) => {
@@ -43,23 +45,34 @@ const createBook = async (req, res) => {
         uploadToCloudinary(file.buffer),
       );
       images = await Promise.all(uploadPromise);
+    } else if (req.body.imageUrl) {
+      images = [{ url: req.body.imageUrl }];
+    } else if (req.body.images) {
+      try {
+        images = typeof req.body.images === "string" ? JSON.parse(req.body.images) : req.body.images;
+      } catch {
+        images = [{ url: req.body.images }];
+      }
     }
 
-    const book = await bookModel.create({
+    const bookData = {
       title,
       author,
-      isbn,
-      price,
+      price: Number(price),
       description,
-      discountPercent,
-      stock,
+      stock: Number(stock) || 0,
       category,
       images,
-      languages,
-      page,
-      publisher,
-      pubishDate,
-    });
+      languages: languages || "English",
+    };
+
+    if (isbn && isbn.trim()) bookData.isbn = isbn.trim();
+    if (discountPercent !== undefined && discountPercent !== "") bookData.discountPercent = Number(discountPercent);
+    if (page !== undefined && page !== "") bookData.page = Number(page);
+    if (publisher && publisher.trim()) bookData.publisher = publisher.trim();
+    if (pubishDate && pubishDate !== "") bookData.pubishDate = new Date(pubishDate);
+
+    const book = await bookModel.create(bookData);
 
     res.status(201).json({ success: true, book });
   } catch (error) {
@@ -88,24 +101,63 @@ const updateBook = async (req, res) => {
     }
 
     if (req.files?.length) {
-      const deletePromises = book.images.map((img) =>
-        cloudinary.uploader.destroy(img.publicId),
-      );
-      await Promise.all(deletePromises);
+      // Try to delete old images from Cloudinary, but don't block the update if it fails
+      try {
+        const deletePromises = (book.images || [])
+          .filter((img) => img && img.publicId)
+          .map((img) => cloudinary.uploader.destroy(img.publicId));
+        await Promise.all(deletePromises);
+      } catch (deleteErr) {
+        console.warn("Failed to delete old images from Cloudinary:", deleteErr.message);
+      }
       const uploadPromises = req.files.map((file) =>
         uploadToCloudinary(file.buffer),
       );
       req.body.images = await Promise.all(uploadPromises);
+    } else if (req.body.imageUrl) {
+      req.body.images = [{ url: req.body.imageUrl }];
+    } else if (req.body.images && typeof req.body.images === "string") {
+      try {
+        req.body.images = JSON.parse(req.body.images);
+      } catch {
+        req.body.images = [{ url: req.body.images }];
+      }
     }
 
-    const updateBook = await bookModel.findByIdAndUpdate(
+    const updateData = { ...req.body };
+    delete updateData.imageUrl;
+
+    if (updateData.price !== undefined && updateData.price !== "") {
+      updateData.price = Number(updateData.price);
+    }
+    if (updateData.stock !== undefined && updateData.stock !== "") {
+      updateData.stock = Number(updateData.stock);
+    }
+    if (updateData.discountPercent !== undefined && updateData.discountPercent !== "") {
+      updateData.discountPercent = Number(updateData.discountPercent);
+    }
+    if (updateData.page !== undefined) {
+      if (updateData.page === "") delete updateData.page;
+      else updateData.page = Number(updateData.page);
+    }
+    if (updateData.isbn !== undefined) {
+      if (!updateData.isbn || !updateData.isbn.trim()) delete updateData.isbn;
+      else updateData.isbn = updateData.isbn.trim();
+    }
+    if (updateData.pubishDate !== undefined) {
+      if (!updateData.pubishDate) delete updateData.pubishDate;
+      else updateData.pubishDate = new Date(updateData.pubishDate);
+    }
+
+    const updatedBook = await bookModel.findByIdAndUpdate(
       req.params.id,
-      { $set: req.body },
+      { $set: updateData },
       { new: true, runValidators: true },
     );
 
-    res.status(200).json({ success: true, book: updateBook });
+    res.status(200).json({ success: true, book: updatedBook });
   } catch (error) {
+
     if (error.name === "CastError") {
       return res
         .status(400)
@@ -169,12 +221,57 @@ const getAllBook = async (req, res) => {
 
     const query = {};
 
-    if (search) {
-      query.$text = { $search: search };
+    if (search && search.trim()) {
+      const cleanSearch = search.trim();
+      const escapedSearch = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(escapedSearch, "i");
+
+      // Also search by category/genre name so searching "Fiction" or "Fantasy" finds books in that genre
+      const matchedCategories = await categoryModel.find({
+        $or: [{ name: searchRegex }, { slug: searchRegex }],
+      }).select("_id");
+
+      const orConditions = [
+        { title: searchRegex },
+        { author: searchRegex },
+        { isbn: searchRegex },
+        { description: searchRegex },
+      ];
+
+      if (matchedCategories.length > 0) {
+        orConditions.push({
+          category: { $in: matchedCategories.map((c) => c._id) },
+        });
+      }
+
+      query.$or = orConditions;
     }
-    if (category) {
-      query.category = category;
+
+    if (category && category !== "all" && category !== "genres") {
+      if (mongoose.Types.ObjectId.isValid(category)) {
+        query.category = category;
+      } else {
+        const categoryDoc = await categoryModel.findOne({
+          $or: [
+            { slug: category.toLowerCase() },
+            { name: new RegExp(`^${category}$`, "i") },
+          ],
+        });
+        if (categoryDoc) {
+          query.category = categoryDoc._id;
+        } else {
+          return res.status(200).json({
+            success: true,
+            count: 0,
+            total: 0,
+            totalPages: 0,
+            currentPage: Number(page),
+            books: [],
+          });
+        }
+      }
     }
+
     if (author) {
       query.author = { $regex: author, $options: "i" };
     }

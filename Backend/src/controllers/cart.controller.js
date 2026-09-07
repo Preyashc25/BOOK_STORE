@@ -86,7 +86,7 @@ const addToCart = async (req, res) => {
       }
       await cart.save();
     }
-    cart = await cartModel.populate(
+    cart = await cart.populate(
       "items.book",
       "title author price discountPercent images stock",
     );
