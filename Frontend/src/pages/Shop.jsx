@@ -1,15 +1,23 @@
 // src/pages/Shop.jsx
 import { useEffect, useState, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import BookCard from "../components/books/BookCard";
 import { getAllBooks } from "../services/bookService";
 import { getAllCategories } from "../services/categoryService";
+
+const sortOptions = [
+  { value: "-createdAt", label: "Newest Arrivals", icon: "✨" },
+  { value: "price", label: "Price: Low to High", icon: "↑" },
+  { value: "-price", label: "Price: High to Low", icon: "↓" },
+  { value: "title", label: "Title: A–Z", icon: "🔤" },
+];
 
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const rawParam = searchParams.get("category") || searchParams.get("genre") || "";
   const currentPage = Number(searchParams.get("page")) || 1;
   const currentSort = searchParams.get("sort") || "-createdAt";
+  const inStockOnly = searchParams.get("inStock") === "true";
 
   const [books, setBooks] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -18,7 +26,20 @@ const Shop = () => {
   const [loading, setLoading] = useState(true);
 
   const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortRef = useRef(null);
   const debounceRef = useRef(null);
+
+  // Close sort dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (sortRef.current && !sortRef.current.contains(e.target)) {
+        setSortOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Fetch all categories once
   useEffect(() => {
@@ -27,8 +48,7 @@ const Shop = () => {
       .catch(() => setCategories([]));
   }, []);
 
-  // Determine active category:
-  // If rawParam is "all" or "genres", or doesn't match any known category, showcase all categories!
+  // Determine active category
   const matchedCategory = categories.find(
     (c) =>
       c._id === rawParam ||
@@ -39,7 +59,7 @@ const Shop = () => {
   const activeCategoryId = matchedCategory ? matchedCategory._id : "";
   const activeCategoryName = matchedCategory ? matchedCategory.name : "All Genres";
 
-  // Sync search input if URL changes externally (e.g. from navbar search)
+  // Sync search input if URL changes externally
   useEffect(() => {
     const urlSearch = searchParams.get("search") || "";
     if (urlSearch !== searchInput) {
@@ -131,9 +151,21 @@ const Shop = () => {
     setSearchParams(params);
   };
 
-  const handleSortChange = (e) => {
+  const handleSortSelect = (sortValue) => {
     const params = Object.fromEntries(searchParams);
-    params.sort = e.target.value;
+    params.sort = sortValue;
+    delete params.page;
+    setSearchParams(params);
+    setSortOpen(false);
+  };
+
+  const toggleInStock = () => {
+    const params = Object.fromEntries(searchParams);
+    if (inStockOnly) {
+      delete params.inStock;
+    } else {
+      params.inStock = "true";
+    }
     delete params.page;
     setSearchParams(params);
   };
@@ -150,24 +182,34 @@ const Shop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const hasActiveFilters = Boolean(activeCategoryId || searchParams.get("search"));
+  const selectedSortOption =
+    sortOptions.find((o) => o.value === currentSort) || sortOptions[0];
+
+  const displayedBooks = inStockOnly ? books.filter((b) => b.stock > 0) : books;
+  const hasActiveFilters = Boolean(
+    activeCategoryId || searchParams.get("search") || inStockOnly
+  );
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+      {/* Header & Refined Toolbar */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8 border-b border-ink/10 pb-6">
         <div>
-          <h1 className="font-display text-3xl md:text-4xl text-ink tracking-tightish">
-            The Full Shelf
+          <span className="font-sans text-xs uppercase tracking-widest text-oxblood font-semibold">
+            The Catalog
+          </span>
+          <h1 className="font-display text-3xl md:text-4xl text-ink tracking-tightish mt-1">
+            The Bookshelf
           </h1>
           <p className="font-sans text-sm text-ink/60 mt-1">
-            Browse our curated library by genre, author, or title.
+            Explore our entire library of literary classics, discoveries, and contemporary works.
           </p>
         </div>
 
-        {/* Search & Sort Controls */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <form onSubmit={handleSearchSubmit} className="relative flex-1 sm:w-72">
+        {/* Custom Toolbar Beside the Search Bar */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Polished Single Search Bar */}
+          <form onSubmit={handleSearchSubmit} className="relative flex-1 sm:w-64 min-w-[200px]">
             <svg
               className="w-4 h-4 text-ink/40 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
               fill="none"
@@ -185,8 +227,8 @@ const Shop = () => {
               type="text"
               value={searchInput}
               onChange={handleSearchChange}
-              placeholder="Search title, author, genre…"
-              className="w-full pl-9 pr-8 py-2 border border-ink/20 bg-white font-sans text-sm focus:outline-none focus:border-leather transition-colors"
+              placeholder="Search by title, author…"
+              className="w-full pl-9 pr-8 py-2 border border-ink/20 bg-white font-sans text-xs focus:outline-none focus:border-leather transition-colors shadow-2xs"
             />
             {searchInput && (
               <button
@@ -200,16 +242,92 @@ const Shop = () => {
             )}
           </form>
 
-          <select
-            value={currentSort}
-            onChange={handleSortChange}
-            className="border border-ink/20 bg-white px-3 py-2 font-sans text-sm text-ink/80 focus:outline-none focus:border-leather cursor-pointer"
+          {/* In-Stock Filter Pill */}
+          <button
+            type="button"
+            onClick={toggleInStock}
+            className={`flex items-center gap-1.5 px-3 py-2 border font-sans text-xs transition-colors cursor-pointer shadow-2xs ${
+              inStockOnly
+                ? "bg-forest/10 border-forest text-forest font-semibold"
+                : "bg-white border-ink/20 text-ink/70 hover:border-leather hover:text-leather"
+            }`}
+            title="Filter available stock"
           >
-            <option value="-createdAt">Newest Arrivals</option>
-            <option value="price">Price: Low to High</option>
-            <option value="-price">Price: High to Low</option>
-            <option value="title">Title: A–Z</option>
-          </select>
+            <span
+              className={`w-2 h-2 rounded-full transition-colors ${
+                inStockOnly ? "bg-forest" : "bg-ink/30"
+              }`}
+            />
+            In Stock Only
+          </button>
+
+          {/* Bespoke Literary Sort Dropdown (Custom UI, NOT standard select) */}
+          <div className="relative" ref={sortRef}>
+            <button
+              type="button"
+              onClick={() => setSortOpen(!sortOpen)}
+              className="flex items-center gap-2 bg-white border border-ink/20 px-3.5 py-2 font-sans text-xs text-ink hover:border-leather transition-colors cursor-pointer shadow-2xs"
+            >
+              <svg
+                className="w-3.5 h-3.5 text-leather"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
+                />
+              </svg>
+              <span className="text-ink/60">Sort:</span>
+              <span className="font-medium">{selectedSortOption.label}</span>
+              <svg
+                className={`w-3.5 h-3.5 text-ink/40 transition-transform duration-200 ${
+                  sortOpen ? "rotate-180" : ""
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+
+            {/* Dropdown Menu Card */}
+            {sortOpen && (
+              <div className="absolute right-0 mt-1.5 w-52 bg-white border border-ink/15 shadow-bookHover z-30 py-1.5 font-sans text-xs animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-ink/40 font-semibold border-b border-ink/5 mb-1">
+                  Sort collection by
+                </div>
+                {sortOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => handleSortSelect(opt.value)}
+                    className={`w-full text-left px-3.5 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                      currentSort === opt.value
+                        ? "bg-shelf text-leather font-semibold"
+                        : "text-ink/80 hover:bg-shelf/60"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{opt.icon}</span>
+                      <span>{opt.label}</span>
+                    </span>
+                    {currentSort === opt.value && (
+                      <span className="text-leather font-bold">✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -250,7 +368,7 @@ const Shop = () => {
             title="Showcase all books of all categories"
           >
             <h2 className="font-sans text-xs uppercase tracking-widest text-ink/50 group-hover:text-leather transition-colors">
-              Genres & Categories
+              Filter by Genre
             </h2>
             <span className="font-sans text-xs text-ink/40 group-hover:text-leather">
               (All)
@@ -334,6 +452,18 @@ const Shop = () => {
                   </button>
                 </span>
               )}
+              {inStockOnly && (
+                <span className="inline-flex items-center gap-1.5 bg-white border border-ink/15 px-2.5 py-1 text-forest">
+                  <strong>In Stock Only</strong>
+                  <button
+                    onClick={toggleInStock}
+                    className="text-ink/40 hover:text-oxblood cursor-pointer"
+                    title="Remove in-stock filter"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
               <button
                 onClick={resetAllFilters}
                 className="ml-auto text-oxblood hover:underline cursor-pointer"
@@ -346,8 +476,9 @@ const Shop = () => {
           {/* Results Count */}
           {!loading && (
             <p className="font-sans text-xs text-ink/50 mb-4">
-              Showing {books.length} {books.length === 1 ? "book" : "books"}
-              {totalBooks > books.length ? ` of ${totalBooks}` : ""}
+              Showing {displayedBooks.length}{" "}
+              {displayedBooks.length === 1 ? "book" : "books"}
+              {totalBooks > displayedBooks.length ? ` of ${totalBooks}` : ""}
               {activeCategoryId ? ` in ${activeCategoryName}` : " across all genres"}
             </p>
           )}
@@ -357,7 +488,7 @@ const Shop = () => {
             <div className="py-20 text-center font-sans text-sm text-ink/50">
               Searching the shelf…
             </div>
-          ) : books.length === 0 ? (
+          ) : displayedBooks.length === 0 ? (
             <div className="border border-dashed border-ink/20 p-12 text-center my-6 bg-shelf/40">
               <h3 className="font-display text-xl text-ink mb-2">
                 No titles found
@@ -365,7 +496,7 @@ const Shop = () => {
               <p className="font-sans text-sm text-ink/60 mb-6 max-w-md mx-auto">
                 {activeCategoryId
                   ? `No books currently found under "${activeCategoryName}". Try exploring other genres or browse our full collection.`
-                  : `No books matched your search "${searchInput}". Try checking your spelling or using broader search terms.`}
+                  : `No books matched your criteria. Try adjusting your search terms or toggling the in-stock filter.`}
               </p>
               <button
                 onClick={resetAllFilters}
@@ -377,7 +508,7 @@ const Shop = () => {
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-10">
-                {books.map((book) => (
+                {displayedBooks.map((book) => (
                   <BookCard key={book._id} book={book} />
                 ))}
               </div>

@@ -12,7 +12,8 @@ const Cart = () => {
   const dispatch = useDispatch();
 
   const { items } = useSelector((state) => state.cart);
-  const shipping = subtotal > 500 ? 0 : 50;
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const shipping = subtotal > 500 ? 0 : items.length > 0 ? 50 : 0;
   const total = subtotal + shipping;
 
   if (items.length === 0) {
